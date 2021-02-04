@@ -33,7 +33,7 @@ require (
 	github.com/gorilla/mux v1.7.4
 	github.com/grpc-ecosystem/go-grpc-middleware v1.2.2
 	github.com/grpc-ecosystem/grpc-gateway v1.14.5
-	github.com/hashicorp/go-hclog v0.14.1
+	github.com/hashicorp/go-hclog v0.15.0
 	github.com/hashicorp/go-plugin v1.4.0
 	github.com/hashicorp/yamux v0.0.0-20190923154419-df201c70410d // indirect
 	github.com/kr/pretty v0.2.1
@@ -41,7 +41,7 @@ require (
 	github.com/mitchellh/mapstructure v1.2.2 // indirect
 	github.com/mjibson/esc v0.2.0
 	github.com/oklog/run v1.1.0 // indirect
-	github.com/olivere/elastic v6.2.27+incompatible
+	github.com/olivere/elastic v6.2.35+incompatible
 	github.com/opentracing-contrib/go-grpc v0.0.0-20191001143057-db30781987df
 	github.com/opentracing-contrib/go-stdlib v0.0.0-20190519235532-cf7a6c988dc9
 	github.com/opentracing/opentracing-go v1.1.0
@@ -62,7 +62,7 @@ require (
 	github.com/spf13/pflag v1.0.5
 	github.com/spf13/viper v1.6.2
 	github.com/stretchr/testify v1.6.1
-	github.com/uber/jaeger-client-go v2.23.1+incompatible
+	github.com/uber/jaeger-client-go v2.25.0+incompatible
 	github.com/uber/jaeger-lib v2.4.0+incompatible
 	github.com/vektra/mockery v0.0.0-20181123154057-e78b021dcbb5
 	github.com/wadey/gocovmerge v0.0.0-20160331181800-b5bfa59ec0ad
@@ -73,12 +73,15 @@ require (
 	go.uber.org/zap v1.16.0
 	golang.org/x/lint v0.0.0-20200302205851-738671d3881b
 	golang.org/x/net v0.0.0-20210119194325-5f4716e94777
-	golang.org/x/sys v0.0.0-20201119102817-f84b799fce68
+	golang.org/x/sys v0.0.0-20210119212857-b64e53b001e4
 	google.golang.org/grpc v1.29.1
 	gopkg.in/ini.v1 v1.52.0 // indirect
 	gopkg.in/jcmturner/goidentity.v3 v3.0.0 // indirect
 	gopkg.in/yaml.v2 v2.4.0
-	honnef.co/go/tools v0.0.1-2019.2.3
+	honnef.co/go/tools v0.1.1
 )
 
-replace github.com/gogo/protobuf => github.com/gogo/protobuf v1.3.2
+replace (
+	github.com/apache/thrift => github.com/jaegertracing/thrift v1.13.0-patch1
+	github.com/gogo/protobuf => github.com/gogo/protobuf v1.3.2
+)
