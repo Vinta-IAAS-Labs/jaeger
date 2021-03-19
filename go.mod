@@ -16,7 +16,6 @@ require (
 	github.com/fortytw2/leaktest v1.3.0 // indirect
 	github.com/frankban/quicktest v1.7.3 // indirect
 	github.com/fsnotify/fsnotify v1.4.9
-	github.com/go-kit/kit v0.10.0 // indirect
 	github.com/go-openapi/errors v0.19.4
 	github.com/go-openapi/loads v0.19.5
 	github.com/go-openapi/runtime v0.19.15
@@ -28,7 +27,7 @@ require (
 	github.com/gogo/googleapis v1.1.0
 	github.com/gogo/protobuf v1.3.2
 	github.com/golang/mock v1.4.3 // indirect
-	github.com/golang/protobuf v1.3.4
+	github.com/golang/protobuf v1.4.3
 	github.com/gorilla/handlers v1.5.1
 	github.com/gorilla/mux v1.7.4
 	github.com/grpc-ecosystem/go-grpc-middleware v1.2.2
@@ -47,10 +46,7 @@ require (
 	github.com/opentracing/opentracing-go v1.1.0
 	github.com/pelletier/go-toml v1.6.0 // indirect
 	github.com/pierrec/lz4 v2.4.1+incompatible // indirect
-	github.com/pkg/errors v0.9.1 // indirect
-	github.com/prometheus/client_golang v1.5.1
-	github.com/prometheus/common v0.10.0 // indirect
-	github.com/prometheus/procfs v0.1.3 // indirect
+	github.com/prometheus/client_golang v1.10.0
 	github.com/rcrowley/go-metrics v0.0.0-20190826022208-cac0b30c2563 // indirect
 	github.com/rs/cors v1.7.0
 	github.com/securego/gosec v0.0.0-20200203094520-d13bb6d2420c
@@ -73,7 +69,7 @@ require (
 	go.uber.org/zap v1.16.0
 	golang.org/x/lint v0.0.0-20200302205851-738671d3881b
 	golang.org/x/net v0.0.0-20210119194325-5f4716e94777
-	golang.org/x/sys v0.0.0-20210119212857-b64e53b001e4
+	golang.org/x/sys v0.0.0-20210309074719-68d13333faf2
 	google.golang.org/grpc v1.29.1
 	gopkg.in/ini.v1 v1.52.0 // indirect
 	gopkg.in/jcmturner/goidentity.v3 v3.0.0 // indirect
