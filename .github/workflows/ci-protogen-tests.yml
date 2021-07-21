@@ -10,13 +10,13 @@ jobs:
   protogen:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v2.3.4
       with:
         submodules: true
 
     - uses: actions/setup-go@v2
       with:
-        go-version: ^1.15
+        go-version: ^1.16
 
     - name: Run protogen validation
       run: make proto && git diff --name-status --exit-code

@@ -27,7 +27,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/golang/protobuf/proto"
+	"github.com/gogo/protobuf/proto"
 	"github.com/gorilla/mux"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -225,7 +225,7 @@ func TestFormatBadBody(t *testing.T) {
 	statusCode, resBodyStr, err := postBytes(server.URL+`/api/v1/spans`, []byte("not good"), createHeader("application/x-thrift"))
 	assert.NoError(t, err)
 	assert.EqualValues(t, http.StatusBadRequest, statusCode)
-	assert.EqualValues(t, "Unable to process request body: Unknown data type 111\n", resBodyStr)
+	assert.Contains(t, resBodyStr, "Unable to process request body:")
 }
 
 func TestCannotReadBodyFromRequest(t *testing.T) {
@@ -264,7 +264,7 @@ func TestSaveSpansV2(t *testing.T) {
 		{body: []byte("[]"), code: http.StatusBadRequest, headers: map[string]string{"Content-Encoding": "gzip"}, resBody: "Unable to process request body: unexpected EOF\n"},
 		{body: []byte("not good"), code: http.StatusBadRequest, resBody: "Unable to process request body: invalid character 'o' in literal null (expecting 'u')\n"},
 		{body: []byte("[{}]"), code: http.StatusBadRequest, resBody: "Unable to process request body: validation failure list:\nid in body is required\ntraceId in body is required\n"},
-		{body: []byte(`[{"id":"1111111111111111", "traceId":"1111111111111111", "localEndpoint": {"ipv4": "A"}}]`), code: http.StatusBadRequest, resBody: "Unable to process request body: wrong ipv4\n"},
+		{body: []byte(`[{"id":"1111111111111111", "traceId":"1111111111111111", "localEndpoint": {"ipv4": "A"}}]`), code: http.StatusBadRequest, resBody: "Unable to process request body: validation failure list:\nvalidation failure list:\nipv4 in body must be of type ipv4: \"A\"\n"},
 	}
 	for _, test := range tests {
 		h := createHeader("application/json")

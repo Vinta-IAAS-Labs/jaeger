@@ -17,6 +17,7 @@ package spanstore
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	"github.com/uber/jaeger-lib/metrics"
@@ -55,18 +56,19 @@ type SpanWriter struct {
 
 // SpanWriterParams holds constructor parameters for NewSpanWriter
 type SpanWriterParams struct {
-	Client              es.Client
-	Logger              *zap.Logger
-	MetricsFactory      metrics.Factory
-	IndexPrefix         string
-	IndexDateLayout     string
-	AllTagsAsFields     bool
-	TagKeysAsFields     []string
-	TagDotReplacement   string
-	Archive             bool
-	UseReadWriteAliases bool
-	ServiceCacheTTL     time.Duration
-	IndexCacheTTL       time.Duration
+	Client                 es.Client
+	Logger                 *zap.Logger
+	MetricsFactory         metrics.Factory
+	IndexPrefix            string
+	SpanIndexDateLayout    string
+	ServiceIndexDateLayout string
+	AllTagsAsFields        bool
+	TagKeysAsFields        []string
+	TagDotReplacement      string
+	Archive                bool
+	UseReadWriteAliases    bool
+	ServiceCacheTTL        time.Duration
+	IndexCacheTTL          time.Duration
 }
 
 // NewSpanWriter creates a new SpanWriter for use
@@ -96,17 +98,20 @@ func NewSpanWriter(p SpanWriterParams) *SpanWriter {
 			},
 		),
 		spanConverter:    dbmodel.NewFromDomain(p.AllTagsAsFields, p.TagKeysAsFields, p.TagDotReplacement),
-		spanServiceIndex: getSpanAndServiceIndexFn(p.Archive, p.UseReadWriteAliases, p.IndexPrefix, p.IndexDateLayout),
+		spanServiceIndex: getSpanAndServiceIndexFn(p.Archive, p.UseReadWriteAliases, p.IndexPrefix, p.SpanIndexDateLayout, p.ServiceIndexDateLayout),
 	}
 }
 
 // CreateTemplates creates index templates.
-func (s *SpanWriter) CreateTemplates(spanTemplate, serviceTemplate string) error {
-	_, err := s.client.CreateTemplate("jaeger-span").Body(spanTemplate).Do(context.Background())
+func (s *SpanWriter) CreateTemplates(spanTemplate, serviceTemplate, indexPrefix string) error {
+	if indexPrefix != "" && !strings.HasSuffix(indexPrefix, "-") {
+		indexPrefix += "-"
+	}
+	_, err := s.client.CreateTemplate(indexPrefix + "jaeger-span").Body(spanTemplate).Do(context.Background())
 	if err != nil {
 		return err
 	}
-	_, err = s.client.CreateTemplate("jaeger-service").Body(serviceTemplate).Do(context.Background())
+	_, err = s.client.CreateTemplate(indexPrefix + "jaeger-service").Body(serviceTemplate).Do(context.Background())
 	if err != nil {
 		return err
 	}
@@ -116,7 +121,7 @@ func (s *SpanWriter) CreateTemplates(spanTemplate, serviceTemplate string) error
 // spanAndServiceIndexFn returns names of span and service indices
 type spanAndServiceIndexFn func(spanTime time.Time) (string, string)
 
-func getSpanAndServiceIndexFn(archive, useReadWriteAliases bool, prefix, dateLayout string) spanAndServiceIndexFn {
+func getSpanAndServiceIndexFn(archive, useReadWriteAliases bool, prefix, spanDateLayout string, serviceDateLayout string) spanAndServiceIndexFn {
 	if prefix != "" {
 		prefix += indexPrefixSeparator
 	}
@@ -137,7 +142,7 @@ func getSpanAndServiceIndexFn(archive, useReadWriteAliases bool, prefix, dateLay
 		}
 	}
 	return func(date time.Time) (string, string) {
-		return indexWithDate(spanIndexPrefix, dateLayout, date), indexWithDate(serviceIndexPrefix, dateLayout, date)
+		return indexWithDate(spanIndexPrefix, spanDateLayout, date), indexWithDate(serviceIndexPrefix, serviceDateLayout, date)
 	}
 }
 

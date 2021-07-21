@@ -17,7 +17,6 @@ package es
 
 import (
 	"flag"
-	"fmt"
 	"strings"
 	"time"
 
@@ -29,39 +28,46 @@ import (
 )
 
 const (
-	suffixUsername            = ".username"
-	suffixPassword            = ".password"
-	suffixSniffer             = ".sniffer"
-	suffixSnifferTLSEnabled   = ".sniffer-tls-enabled"
-	suffixTokenPath           = ".token-file"
-	suffixServerURLs          = ".server-urls"
-	suffixMaxSpanAge          = ".max-span-age"
-	suffixNumShards           = ".num-shards"
-	suffixNumReplicas         = ".num-replicas"
-	suffixBulkSize            = ".bulk.size"
-	suffixBulkWorkers         = ".bulk.workers"
-	suffixBulkActions         = ".bulk.actions"
-	suffixBulkFlushInterval   = ".bulk.flush-interval"
-	suffixTimeout             = ".timeout"
-	suffixIndexPrefix         = ".index-prefix"
-	suffixIndexDateSeparator  = ".index-date-separator"
-	suffixTagsAsFields        = ".tags-as-fields"
-	suffixTagsAsFieldsAll     = suffixTagsAsFields + ".all"
-	suffixTagsAsFieldsInclude = suffixTagsAsFields + ".include"
-	suffixTagsFile            = suffixTagsAsFields + ".config-file"
-	suffixTagDeDotChar        = suffixTagsAsFields + ".dot-replacement"
-	suffixReadAlias           = ".use-aliases"
-	suffixCreateIndexTemplate = ".create-index-templates"
-	suffixEnabled             = ".enabled"
-	suffixVersion             = ".version"
-	suffixMaxDocCount         = ".max-doc-count"
-
+	suffixUsername                       = ".username"
+	suffixPassword                       = ".password"
+	suffixSniffer                        = ".sniffer"
+	suffixSnifferTLSEnabled              = ".sniffer-tls-enabled"
+	suffixTokenPath                      = ".token-file"
+	suffixServerURLs                     = ".server-urls"
+	suffixRemoteReadClusters             = ".remote-read-clusters"
+	suffixMaxSpanAge                     = ".max-span-age"
+	suffixNumShards                      = ".num-shards"
+	suffixNumReplicas                    = ".num-replicas"
+	suffixBulkSize                       = ".bulk.size"
+	suffixBulkWorkers                    = ".bulk.workers"
+	suffixBulkActions                    = ".bulk.actions"
+	suffixBulkFlushInterval              = ".bulk.flush-interval"
+	suffixTimeout                        = ".timeout"
+	suffixIndexPrefix                    = ".index-prefix"
+	suffixIndexDateSeparator             = ".index-date-separator"
+	suffixIndexRolloverFrequencySpans    = ".index-rollover-frequency-spans"
+	suffixIndexRolloverFrequencyServices = ".index-rollover-frequency-services"
+	suffixTagsAsFields                   = ".tags-as-fields"
+	suffixTagsAsFieldsAll                = suffixTagsAsFields + ".all"
+	suffixTagsAsFieldsInclude            = suffixTagsAsFields + ".include"
+	suffixTagsFile                       = suffixTagsAsFields + ".config-file"
+	suffixTagDeDotChar                   = suffixTagsAsFields + ".dot-replacement"
+	suffixReadAlias                      = ".use-aliases"
+	suffixUseILM                         = ".use-ilm"
+	suffixCreateIndexTemplate            = ".create-index-templates"
+	suffixEnabled                        = ".enabled"
+	suffixVersion                        = ".version"
+	suffixMaxDocCount                    = ".max-doc-count"
+	suffixLogLevel                       = ".log-level"
 	// default number of documents to return from a query (elasticsearch allowed limit)
 	// see search.max_buckets and index.max_result_window
-	defaultMaxDocCount = 10_000
-	defaultServerURL   = "http://127.0.0.1:9200"
+	defaultMaxDocCount        = 10_000
+	defaultServerURL          = "http://127.0.0.1:9200"
+	defaultRemoteReadClusters = ""
 	// default separator for Elasticsearch index date layout.
 	defaultIndexDateSeparator = "-"
+
+	defaultIndexRolloverFrequency = "day"
 )
 
 // TODO this should be moved next to config.Configuration struct (maybe ./flags package)
@@ -83,61 +89,51 @@ type namespaceConfig struct {
 // NewOptions creates a new Options struct.
 func NewOptions(primaryNamespace string, otherNamespaces ...string) *Options {
 	// TODO all default values should be defined via cobra flags
+	defaultConfig := config.Configuration{
+		Username:          "",
+		Password:          "",
+		Sniffer:           false,
+		MaxSpanAge:        72 * time.Hour,
+		NumShards:         5,
+		NumReplicas:       1,
+		BulkSize:          5 * 1000 * 1000,
+		BulkWorkers:       1,
+		BulkActions:       1000,
+		BulkFlushInterval: time.Millisecond * 200,
+		Tags: config.TagsAsFields{
+			DotReplacement: "@",
+		},
+		Enabled:              true,
+		CreateIndexTemplates: true,
+		Version:              0,
+		Servers:              []string{defaultServerURL},
+		RemoteReadClusters:   []string{},
+		MaxDocCount:          defaultMaxDocCount,
+		LogLevel:             "error",
+	}
 	options := &Options{
 		Primary: namespaceConfig{
-			Configuration: config.Configuration{
-				Username:          "",
-				Password:          "",
-				Sniffer:           false,
-				MaxSpanAge:        72 * time.Hour,
-				NumShards:         5,
-				NumReplicas:       1,
-				BulkSize:          5 * 1000 * 1000,
-				BulkWorkers:       1,
-				BulkActions:       1000,
-				BulkFlushInterval: time.Millisecond * 200,
-				Tags: config.TagsAsFields{
-					DotReplacement: "@",
-				},
-				Enabled:              true,
-				CreateIndexTemplates: true,
-				Version:              0,
-				Servers:              []string{defaultServerURL},
-				MaxDocCount:          defaultMaxDocCount,
-			},
-			namespace: primaryNamespace,
+			Configuration: defaultConfig,
+			namespace:     primaryNamespace,
 		},
 		others: make(map[string]*namespaceConfig, len(otherNamespaces)),
 	}
 
+	// Other namespaces need to be explicitly enabled.
+	defaultConfig.Enabled = false
 	for _, namespace := range otherNamespaces {
-		options.others[namespace] = &namespaceConfig{namespace: namespace}
+		options.others[namespace] = &namespaceConfig{
+			Configuration: defaultConfig,
+			namespace:     namespace,
+		}
 	}
 
 	return options
 }
 
-// NewOptionsFromConfig creates Options from primary and archive config
-func NewOptionsFromConfig(primary config.Configuration, archive config.Configuration) *Options {
-	return &Options{
-		Primary: namespaceConfig{
-			namespace:     primaryNamespace,
-			Configuration: primary,
-		},
-		others: map[string]*namespaceConfig{
-			archiveNamespace: {
-				namespace:     archiveNamespace,
-				Configuration: archive,
-			},
-		},
-	}
-}
-
 func (config *namespaceConfig) getTLSFlagsConfig() tlscfg.ClientFlagsConfig {
 	return tlscfg.ClientFlagsConfig{
-		Prefix:         config.namespace,
-		ShowEnabled:    true,
-		ShowServerName: true,
+		Prefix: config.namespace,
 	}
 }
 
@@ -170,14 +166,15 @@ func addFlags(flagSet *flag.FlagSet, nsConfig *namespaceConfig) {
 		nsConfig.namespace+suffixServerURLs,
 		defaultServerURL,
 		"The comma-separated list of Elasticsearch servers, must be full url i.e. http://localhost:9200")
+	flagSet.String(
+		nsConfig.namespace+suffixRemoteReadClusters,
+		defaultRemoteReadClusters,
+		"Comma-separated list of Elasticsearch remote cluster names for cross-cluster querying."+
+			"See Elasticsearch remote clusters and cross-cluster query api.")
 	flagSet.Duration(
 		nsConfig.namespace+suffixTimeout,
 		nsConfig.Timeout,
 		"Timeout used for queries. A Timeout of zero means no timeout")
-	flagSet.Duration(
-		nsConfig.namespace+suffixMaxSpanAge,
-		nsConfig.MaxSpanAge,
-		"The maximum lookback for spans in Elasticsearch")
 	flagSet.Int64(
 		nsConfig.namespace+suffixNumShards,
 		nsConfig.NumShards,
@@ -209,7 +206,17 @@ func addFlags(flagSet *flag.FlagSet, nsConfig *namespaceConfig) {
 	flagSet.String(
 		nsConfig.namespace+suffixIndexDateSeparator,
 		defaultIndexDateSeparator,
-		"Optional date separator of Jaeger indices. For example \".\" creates \"jaeger-span-2020.11.20 \".")
+		"Optional date separator of Jaeger indices. For example \".\" creates \"jaeger-span-2020.11.20\".")
+	flagSet.String(
+		nsConfig.namespace+suffixIndexRolloverFrequencySpans,
+		defaultIndexRolloverFrequency,
+		"Rotates jaeger-span indices over the given period. For example \"day\" creates \"jaeger-span-yyyy-MM-dd\" every day after UTC 12AM. Valid options: [hour, day]. "+
+			"This does not delete old indices. For details on complete index management solutions supported by Jaeger, refer to: https://www.jaegertracing.io/docs/deployment/#elasticsearch-rollover")
+	flagSet.String(
+		nsConfig.namespace+suffixIndexRolloverFrequencyServices,
+		defaultIndexRolloverFrequency,
+		"Rotates jaeger-service indices over the given period. For example \"day\" creates \"jaeger-service-yyyy-MM-dd\" every day after UTC 12AM. Valid options: [hour, day]. "+
+			"This does not delete old indices. For details on complete index management solutions supported by Jaeger, refer to: https://www.jaegertracing.io/docs/deployment/#elasticsearch-rollover")
 	flagSet.Bool(
 		nsConfig.namespace+suffixTagsAsFieldsAll,
 		nsConfig.Tags.AllAsFields,
@@ -231,7 +238,13 @@ func addFlags(flagSet *flag.FlagSet, nsConfig *namespaceConfig) {
 		nsConfig.UseReadWriteAliases,
 		"Use read and write aliases for indices. Use this option with Elasticsearch rollover "+
 			"API. It requires an external component to create aliases before startup and then performing its management. "+
-			"Note that "+nsConfig.namespace+suffixMaxSpanAge+" will influence trace search window start times.")
+			"Note that es"+suffixMaxSpanAge+" will influence trace search window start times.")
+	flagSet.Bool(
+		nsConfig.namespace+suffixUseILM,
+		nsConfig.UseILM,
+		"(experimental) Option to enable ILM for jaeger span & service indices. Use this option with  "+nsConfig.namespace+suffixReadAlias+". "+
+			"It requires an external component to create aliases before startup and then performing its management. "+
+			"ILM policy must be manually created in ES before startup. Supported only for elasticsearch version 7+.")
 	flagSet.Bool(
 		nsConfig.namespace+suffixCreateIndexTemplate,
 		nsConfig.CreateIndexTemplates,
@@ -248,11 +261,23 @@ func addFlags(flagSet *flag.FlagSet, nsConfig *namespaceConfig) {
 		nsConfig.namespace+suffixMaxDocCount,
 		nsConfig.MaxDocCount,
 		"The maximum document count to return from an Elasticsearch query. This will also apply to aggregations.")
+	flagSet.String(
+		nsConfig.namespace+suffixLogLevel,
+		nsConfig.LogLevel,
+		"The Elasticsearch client log-level. Valid levels: [debug, info, error]")
+
 	if nsConfig.namespace == archiveNamespace {
 		flagSet.Bool(
 			nsConfig.namespace+suffixEnabled,
 			nsConfig.Enabled,
 			"Enable extra storage")
+	} else {
+		// MaxSpanAge is only relevant when searching for unarchived traces.
+		// Archived traces are searched with no look-back limit.
+		flagSet.Duration(
+			nsConfig.namespace+suffixMaxSpanAge,
+			nsConfig.MaxSpanAge,
+			"The maximum lookback for spans in Elasticsearch")
 	}
 	nsConfig.getTLSFlagsConfig().AddFlags(flagSet)
 }
@@ -281,7 +306,6 @@ func initFromViper(cfg *namespaceConfig, v *viper.Viper) {
 	cfg.BulkFlushInterval = v.GetDuration(cfg.namespace + suffixBulkFlushInterval)
 	cfg.Timeout = v.GetDuration(cfg.namespace + suffixTimeout)
 	cfg.IndexPrefix = v.GetString(cfg.namespace + suffixIndexPrefix)
-	cfg.IndexDateLayout = initDateLayout(v.GetString(cfg.namespace + suffixIndexDateSeparator))
 	cfg.Tags.AllAsFields = v.GetBool(cfg.namespace + suffixTagsAsFieldsAll)
 	cfg.Tags.Include = v.GetString(cfg.namespace + suffixTagsAsFieldsInclude)
 	cfg.Tags.File = v.GetString(cfg.namespace + suffixTagsFile)
@@ -290,12 +314,29 @@ func initFromViper(cfg *namespaceConfig, v *viper.Viper) {
 	cfg.Enabled = v.GetBool(cfg.namespace + suffixEnabled)
 	cfg.CreateIndexTemplates = v.GetBool(cfg.namespace + suffixCreateIndexTemplate)
 	cfg.Version = uint(v.GetInt(cfg.namespace + suffixVersion))
+	cfg.LogLevel = v.GetString(cfg.namespace + suffixLogLevel)
 
 	cfg.MaxDocCount = v.GetInt(cfg.namespace + suffixMaxDocCount)
+	cfg.UseILM = v.GetBool(cfg.namespace + suffixUseILM)
 
 	// TODO: Need to figure out a better way for do this.
 	cfg.AllowTokenFromContext = v.GetBool(spanstore.StoragePropagationKey)
 	cfg.TLS = cfg.getTLSFlagsConfig().InitFromViper(v)
+
+	remoteReadClusters := stripWhiteSpace(v.GetString(cfg.namespace + suffixRemoteReadClusters))
+	if len(remoteReadClusters) > 0 {
+		cfg.RemoteReadClusters = strings.Split(remoteReadClusters, ",")
+	}
+
+	cfg.IndexRolloverFrequencySpans = strings.ToLower(v.GetString(cfg.namespace + suffixIndexRolloverFrequencySpans))
+	cfg.IndexRolloverFrequencyServices = strings.ToLower(v.GetString(cfg.namespace + suffixIndexRolloverFrequencyServices))
+
+	separator := v.GetString(cfg.namespace + suffixIndexDateSeparator)
+	cfg.IndexDateLayoutSpans = initDateLayout(cfg.IndexRolloverFrequencySpans, separator)
+	cfg.IndexDateLayoutServices = initDateLayout(cfg.IndexRolloverFrequencyServices, separator)
+
+	// Dependencies calculation should be daily, and this index size is very small
+	cfg.IndexDateLayoutDependencies = initDateLayout(defaultIndexRolloverFrequency, separator)
 }
 
 // GetPrimary returns primary configuration.
@@ -322,6 +363,11 @@ func stripWhiteSpace(str string) string {
 	return strings.Replace(str, " ", "", -1)
 }
 
-func initDateLayout(separator string) string {
-	return fmt.Sprintf("2006%s01%s02", separator, separator)
+func initDateLayout(rolloverFreq, sep string) string {
+	// default to daily format
+	indexLayout := "2006" + sep + "01" + sep + "02"
+	if rolloverFreq == "hour" {
+		indexLayout = indexLayout + sep + "15"
+	}
+	return indexLayout
 }

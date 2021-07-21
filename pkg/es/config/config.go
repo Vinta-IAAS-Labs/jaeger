@@ -20,6 +20,7 @@ import (
 	"context"
 	"crypto/tls"
 	"errors"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 	"os"
@@ -32,6 +33,7 @@ import (
 	"github.com/olivere/elastic"
 	"github.com/uber/jaeger-lib/metrics"
 	"go.uber.org/zap"
+	"go.uber.org/zap/zapgrpc"
 
 	"github.com/jaegertracing/jaeger/pkg/config/tlscfg"
 	"github.com/jaegertracing/jaeger/pkg/es"
@@ -42,30 +44,37 @@ import (
 
 // Configuration describes the configuration properties needed to connect to an ElasticSearch cluster
 type Configuration struct {
-	Servers               []string       `mapstructure:"server_urls"`
-	Username              string         `mapstructure:"username"`
-	Password              string         `mapstructure:"password" json:"-"`
-	TokenFilePath         string         `mapstructure:"token_file"`
-	AllowTokenFromContext bool           `mapstructure:"-"`
-	Sniffer               bool           `mapstructure:"sniffer"` // https://github.com/olivere/elastic/wiki/Sniffing
-	SnifferTLSEnabled     bool           `mapstructure:"sniffer_tls_enabled"`
-	MaxDocCount           int            `mapstructure:"-"`                     // Defines maximum number of results to fetch from storage per query
-	MaxSpanAge            time.Duration  `yaml:"max_span_age" mapstructure:"-"` // configures the maximum lookback on span reads
-	NumShards             int64          `yaml:"shards" mapstructure:"num_shards"`
-	NumReplicas           int64          `yaml:"replicas" mapstructure:"num_replicas"`
-	Timeout               time.Duration  `validate:"min=500" mapstructure:"-"`
-	BulkSize              int            `mapstructure:"-"`
-	BulkWorkers           int            `mapstructure:"-"`
-	BulkActions           int            `mapstructure:"-"`
-	BulkFlushInterval     time.Duration  `mapstructure:"-"`
-	IndexPrefix           string         `mapstructure:"index_prefix"`
-	IndexDateLayout       string         `mapstructure:"index_date_layout"`
-	Tags                  TagsAsFields   `mapstructure:"tags_as_fields"`
-	Enabled               bool           `mapstructure:"-"`
-	TLS                   tlscfg.Options `mapstructure:"tls"`
-	UseReadWriteAliases   bool           `mapstructure:"use_aliases"`
-	CreateIndexTemplates  bool           `mapstructure:"create_mappings"`
-	Version               uint           `mapstructure:"version"`
+	Servers                        []string       `mapstructure:"server_urls"`
+	RemoteReadClusters             []string       `mapstructure:"remote_read_clusters"`
+	Username                       string         `mapstructure:"username"`
+	Password                       string         `mapstructure:"password" json:"-"`
+	TokenFilePath                  string         `mapstructure:"token_file"`
+	AllowTokenFromContext          bool           `mapstructure:"-"`
+	Sniffer                        bool           `mapstructure:"sniffer"` // https://github.com/olivere/elastic/wiki/Sniffing
+	SnifferTLSEnabled              bool           `mapstructure:"sniffer_tls_enabled"`
+	MaxDocCount                    int            `mapstructure:"-"`                     // Defines maximum number of results to fetch from storage per query
+	MaxSpanAge                     time.Duration  `yaml:"max_span_age" mapstructure:"-"` // configures the maximum lookback on span reads
+	NumShards                      int64          `yaml:"shards" mapstructure:"num_shards"`
+	NumReplicas                    int64          `yaml:"replicas" mapstructure:"num_replicas"`
+	Timeout                        time.Duration  `validate:"min=500" mapstructure:"-"`
+	BulkSize                       int            `mapstructure:"-"`
+	BulkWorkers                    int            `mapstructure:"-"`
+	BulkActions                    int            `mapstructure:"-"`
+	BulkFlushInterval              time.Duration  `mapstructure:"-"`
+	IndexPrefix                    string         `mapstructure:"index_prefix"`
+	IndexDateLayoutSpans           string         `mapstructure:"-"`
+	IndexDateLayoutServices        string         `mapstructure:"-"`
+	IndexDateLayoutDependencies    string         `mapstructure:"-"`
+	IndexRolloverFrequencySpans    string         `mapstructure:"-"`
+	IndexRolloverFrequencyServices string         `mapstructure:"-"`
+	Tags                           TagsAsFields   `mapstructure:"tags_as_fields"`
+	Enabled                        bool           `mapstructure:"-"`
+	TLS                            tlscfg.Options `mapstructure:"tls"`
+	UseReadWriteAliases            bool           `mapstructure:"use_aliases"`
+	CreateIndexTemplates           bool           `mapstructure:"create_mappings"`
+	UseILM                         bool           `mapstructure:"use_ilm"`
+	Version                        uint           `mapstructure:"version"`
+	LogLevel                       string         `mapstructure:"log_level"`
 }
 
 // TagsAsFields holds configuration for tag schema.
@@ -85,12 +94,17 @@ type TagsAsFields struct {
 // ClientBuilder creates new es.Client
 type ClientBuilder interface {
 	NewClient(logger *zap.Logger, metricsFactory metrics.Factory) (es.Client, error)
+	GetRemoteReadClusters() []string
 	GetNumShards() int64
 	GetNumReplicas() int64
 	GetMaxSpanAge() time.Duration
 	GetMaxDocCount() int
 	GetIndexPrefix() string
-	GetIndexDateLayout() string
+	GetIndexDateLayoutSpans() string
+	GetIndexDateLayoutServices() string
+	GetIndexDateLayoutDependencies() string
+	GetIndexRolloverFrequencySpansDuration() time.Duration
+	GetIndexRolloverFrequencyServicesDuration() time.Duration
 	GetTagsFilePath() string
 	GetAllTagsAsFields() bool
 	GetTagDotReplacement() string
@@ -100,6 +114,8 @@ type ClientBuilder interface {
 	IsCreateIndexTemplates() bool
 	GetVersion() uint
 	TagKeysAsFields() ([]string, error)
+	GetUseILM() bool
+	GetLogLevel() string
 }
 
 // NewClient creates a new ElasticSearch client
@@ -187,6 +203,9 @@ func (c *Configuration) NewClient(logger *zap.Logger, metricsFactory metrics.Fac
 
 // ApplyDefaults copies settings from source unless its own value is non-zero.
 func (c *Configuration) ApplyDefaults(source *Configuration) {
+	if len(c.RemoteReadClusters) == 0 {
+		c.RemoteReadClusters = source.RemoteReadClusters
+	}
 	if c.Username == "" {
 		c.Username = source.Username
 	}
@@ -235,6 +254,14 @@ func (c *Configuration) ApplyDefaults(source *Configuration) {
 	if c.MaxDocCount == 0 {
 		c.MaxDocCount = source.MaxDocCount
 	}
+	if c.LogLevel == "" {
+		c.LogLevel = source.LogLevel
+	}
+}
+
+// GetRemoteReadClusters returns list of remote read clusters
+func (c *Configuration) GetRemoteReadClusters() []string {
+	return c.RemoteReadClusters
 }
 
 // GetNumShards returns number of shards from Configuration
@@ -262,9 +289,35 @@ func (c *Configuration) GetIndexPrefix() string {
 	return c.IndexPrefix
 }
 
-// GetIndexDateLayout returns index date layout
-func (c *Configuration) GetIndexDateLayout() string {
-	return c.IndexDateLayout
+// GetIndexDateLayoutSpans returns jaeger-span index date layout
+func (c *Configuration) GetIndexDateLayoutSpans() string {
+	return c.IndexDateLayoutSpans
+}
+
+// GetIndexDateLayoutServices returns jaeger-service index date layout
+func (c *Configuration) GetIndexDateLayoutServices() string {
+	return c.IndexDateLayoutServices
+}
+
+// GetIndexDateLayoutDependencies returns jaeger-dependencies index date layout
+func (c *Configuration) GetIndexDateLayoutDependencies() string {
+	return c.IndexDateLayoutDependencies
+}
+
+// GetIndexRolloverFrequencySpansDuration returns jaeger-span index rollover frequency duration
+func (c *Configuration) GetIndexRolloverFrequencySpansDuration() time.Duration {
+	if c.IndexRolloverFrequencySpans == "hour" {
+		return -1 * time.Hour
+	}
+	return -24 * time.Hour
+}
+
+// GetIndexRolloverFrequencyServicesDuration returns jaeger-service index rollover frequency duration
+func (c *Configuration) GetIndexRolloverFrequencyServicesDuration() time.Duration {
+	if c.IndexRolloverFrequencyServices == "hour" {
+		return -1 * time.Hour
+	}
+	return -24 * time.Hour
 }
 
 // GetTagsFilePath returns a path to file containing tag keys
@@ -291,6 +344,16 @@ func (c *Configuration) GetTagDotReplacement() string {
 // GetUseReadWriteAliases indicates whether read alias should be used
 func (c *Configuration) GetUseReadWriteAliases() bool {
 	return c.UseReadWriteAliases
+}
+
+// GetUseILM indicates whether ILM should be used
+func (c *Configuration) GetUseILM() bool {
+	return c.UseILM
+}
+
+// GetLogLevel returns the log-level the ES client should log at.
+func (c *Configuration) GetLogLevel() string {
+	return c.LogLevel
 }
 
 // GetTokenFilePath returns file path containing the bearer token
@@ -355,11 +418,46 @@ func (c *Configuration) getConfigOptions(logger *zap.Logger) ([]elastic.ClientOp
 	}
 	options = append(options, elastic.SetHttpClient(httpClient))
 	options = append(options, elastic.SetBasicAuth(c.Username, c.Password))
+
+	options, err := addLoggerOptions(options, c.LogLevel)
+	if err != nil {
+		return options, err
+	}
+
 	transport, err := GetHTTPRoundTripper(c, logger)
 	if err != nil {
 		return nil, err
 	}
 	httpClient.Transport = transport
+	return options, nil
+}
+
+func addLoggerOptions(options []elastic.ClientOptionFunc, logLevel string) ([]elastic.ClientOptionFunc, error) {
+	// Decouple ES logger from the log-level assigned to the parent application's log-level; otherwise, the least
+	// permissive log-level will dominate.
+	// e.g. --log-level=info and --es.log-level=debug would mute ES's debug logging and would require --log-level=debug
+	// to show ES debug logs.
+	prodConfig := zap.NewProductionConfig()
+	prodConfig.Level.SetLevel(zap.DebugLevel)
+
+	esLogger, err := prodConfig.Build()
+	if err != nil {
+		return options, err
+	}
+
+	// Elastic client requires a "Printf"-able logger.
+	l := zapgrpc.NewLogger(esLogger)
+	switch logLevel {
+	case "debug":
+		l = zapgrpc.NewLogger(esLogger, zapgrpc.WithDebug())
+		options = append(options, elastic.SetTraceLog(l))
+	case "info":
+		options = append(options, elastic.SetInfoLog(l))
+	case "error":
+		options = append(options, elastic.SetErrorLog(l))
+	default:
+		return options, fmt.Errorf("unrecognized log-level: \"%s\"", logLevel)
+	}
 	return options, nil
 }
 

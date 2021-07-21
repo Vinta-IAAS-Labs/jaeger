@@ -1,7 +1,7 @@
 <img align="right" width="290" height="290" src="https://www.jaegertracing.io/img/jaeger-vector.svg">
 
 
-[![Gitter chat][gitter-img]][gitter]
+[![Slack chat][slack-img]](#get-in-touch)
 [![Project+Community stats][community-badge]][community-stats]
 [![OpenTracing-1.0][ot-badge]](https://opentracing.io)
 [![Mentioned in Awesome Go](https://awesome.re/mentioned-badge-flat.svg)](https://github.com/avelino/awesome-go#performance)
@@ -92,6 +92,23 @@ using Zipkin libraries, you do not have to rewrite all that code. Jaeger provide
 by accepting spans in Zipkin formats (Thrift or JSON v1/v2) over HTTP. Switching from Zipkin backend is just a matter
 of routing the traffic from Zipkin libraries to the Jaeger backend.
 
+## Version Compatibility Guarantees
+
+Occasionally, CLI flags can be deprecated due to, for example, usability improvements or new functionality.
+In such situations, developers introducing the deprecation are required to follow [these guidelines](./CONTRIBUTING.md#deprecating-cli-flags).
+
+In short, for a deprecated CLI flag, you should expect to see the following message in the `--help` documentation:
+```
+(deprecated, will be removed after yyyy-mm-dd or in release vX.Y.Z, whichever is later)
+```
+
+A grace period of at least **3 months** or **two minor version bumps** (whichever is later) from the first release
+containing the deprecation notice will be provided before the deprecated CLI flag _can_ be deleted.
+
+For example, consider a scenario where v1.28.0 is released on 01-Jun-2021 containing a deprecation notice for a CLI flag.
+This flag will remain in a deprecated state until the later of 01-Sep-2021 or v1.30.0 where it _can_ be removed on or after either of those events.
+It may remain deprecated for longer than the aforementioned grace period.
+
 ## Related Repositories
 
 ### Documentation
@@ -126,15 +143,21 @@ See [CONTRIBUTING](./CONTRIBUTING.md).
 
 See [CONTRIBUTING](./CONTRIBUTING.md).
 
-## Maintainers
+Thanks to all the people who already contributed!
+
+<a href="https://github.com/jaegertracing/jaeger/graphs/contributors">
+  <img src="https://contributors-img.web.app/image?repo=jaegertracing/jaeger" />
+</a>
+
+### Maintainers
 
 Rules for becoming a maintainer are defined in the [GOVERNANCE](./GOVERNANCE.md) document.
 Below are the official maintainers of the Jaeger project.
 Please use `@jaegertracing/jaeger-maintainers` to tag them on issues / PRs.
 
+* [@albertteoh](https://github.com/albertteoh)
 * [@joe-elliott](https://github.com/joe-elliott)
 * [@jpkrohling](https://github.com/jpkrohling)
-* [@objectiser](https://github.com/objectiser)
 * [@pavolloffay](https://github.com/pavolloffay)
 * [@vprithvi](https://github.com/vprithvi)
 * [@yurishkuro](https://github.com/yurishkuro)
@@ -146,6 +169,7 @@ Some repositories under [jaegertracing](https://github.com/jaegertracing) org ha
 We are grateful to our former maintainers for their contributions to the Jaeger project.
 
 * [@black-adder](https://github.com/black-adder)
+* [@objectiser](https://github.com/objectiser)
 * [@tiffon](https://github.com/tiffon)
 
 ## Project Status Bi-Weekly Meeting
@@ -157,13 +181,13 @@ The Jaeger contributors meet bi-weekly, and everyone is welcome to join.
 
 See https://www.jaegertracing.io/docs/roadmap/
 
-## Questions, Discussions, Bug Reports
+## Get in Touch
 
-Reach project contributors via these channels:
+Have questions, suggestions, bug reports? Reach the project community via these channels:
 
- * [jaeger-tracing mail group](https://groups.google.com/forum/#!forum/jaeger-tracing)
- * [Gitter chat room](https://gitter.im/jaegertracing/Lobby)
- * [Github issues](https://github.com/jaegertracing/jaeger/issues)
+ * [Slack chat room `#jaeger`][slack] (need to join [CNCF Slack][slack-join] for the first time)
+ * [`jaeger-tracing` mail group](https://groups.google.com/forum/#!forum/jaeger-tracing)
+ * GitHub [issues](https://github.com/jaegertracing/jaeger/issues) and [discussions](https://github.com/jaegertracing/jaeger/discussions)
 
 ## Adopters
 
@@ -193,5 +217,6 @@ If you would like to add your organization to the list, please comment on our
 [community-badge]: https://img.shields.io/badge/Project+Community-stats-blue.svg
 [community-stats]: https://all.devstats.cncf.io/d/54/project-health?orgId=1&var-repogroup_name=Jaeger
 [hotrod-tutorial]: https://medium.com/@YuriShkuro/take-opentracing-for-a-hotrod-ride-f6e3141f7941
-[gitter]: https://gitter.im/jaegertracing/Lobby
-[gitter-img]: https://img.shields.io/badge/gitter-join%20chat%20%E2%86%92-brightgreen.svg
+[slack]: https://cloud-native.slack.com/archives/CGG7NFUJ3
+[slack-join]: https://slack.cncf.io
+[slack-img]: https://img.shields.io/badge/slack-join%20chat%20%E2%86%92-brightgreen?logo=slack

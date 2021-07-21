@@ -25,7 +25,6 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/jaegertracing/jaeger/pkg/cassandra"
-	cassCfg "github.com/jaegertracing/jaeger/pkg/cassandra/config"
 	"github.com/jaegertracing/jaeger/pkg/cassandra/mocks"
 	"github.com/jaegertracing/jaeger/pkg/config"
 	"github.com/jaegertracing/jaeger/pkg/testutils"
@@ -56,7 +55,7 @@ func TestCassandraFactory(t *testing.T) {
 	f := NewFactory()
 	v, command := config.Viperize(f.AddFlags)
 	command.ParseFlags([]string{"--cassandra-archive.enabled=true"})
-	f.InitFromViper(v)
+	f.InitFromViper(v, zap.NewNop())
 
 	// after InitFromViper, f.primaryConfig points to a real session builder that will fail in unit tests,
 	// so we override it with a mock.
@@ -111,7 +110,7 @@ func TestExclusiveWhitelistBlacklist(t *testing.T) {
 	command.ParseFlags([]string{"--cassandra-archive.enabled=true",
 		"--cassandra.index.tag-whitelist=a,b,c",
 		"--cassandra.index.tag-blacklist=a,b,c"})
-	f.InitFromViper(v)
+	f.InitFromViper(v, zap.NewNop())
 
 	// after InitFromViper, f.primaryConfig points to a real session builder that will fail in unit tests,
 	// so we override it with a mock.
@@ -192,15 +191,4 @@ func TestInitFromOptions(t *testing.T) {
 	assert.Equal(t, o, f.Options)
 	assert.Equal(t, o.GetPrimary(), f.primaryConfig)
 	assert.Equal(t, o.Get(archiveStorageConfig), f.archiveConfig)
-}
-
-func TestNewOptions(t *testing.T) {
-	primaryCfg := cassCfg.Configuration{Keyspace: "primary"}
-	archiveCfg := cassCfg.Configuration{Keyspace: "archive"}
-	o := NewOptionsFromConfig(primaryCfg, archiveCfg)
-	assert.Equal(t, primaryCfg, o.Primary.Configuration)
-	assert.Equal(t, primaryStorageConfig, o.Primary.namespace)
-	assert.Equal(t, 1, len(o.others))
-	assert.Equal(t, archiveCfg, o.others[archiveStorageConfig].Configuration)
-	assert.Equal(t, archiveStorageConfig, o.others[archiveStorageConfig].namespace)
 }
